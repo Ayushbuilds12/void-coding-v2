@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Void Coding - Learn, Build, and Master Coding With AI</title>
+    <meta name="description" content="An AI-powered coding education platform. Learn programming, build workspaces, audit code, and interact with your AI Mentor." />
+    <link rel="canonical" href="https://voidcoding.com/" />
+    <meta name="google-site-verification" content="VOID_GOOGLE_SEARCH_CONSOLE_VERIFICATION_PLACEHOLDER" />
+
+    <!-- Structured Data for Google Indexing -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        "name": "Void Coding",
+        "operatingSystem": "All",
+        "applicationCategory": "EducationalApplication, DeveloperApplication",
+        "offers": {
+          "@type": "Offer",
+          "price": "499",
+          "priceCurrency": "INR"
+        },
+        "aggregateRating": {
+          "@type": "AggregateRating",
+          "ratingValue": "4.9",
+          "ratingCount": "1242"
+        },
+        "description": "Learn, Build, and Master Coding with AI. Void Coding features interactive code learning, dynamic 3D memory visualization, AI-powered project creation, and premium line-by-line guidance.",
+        "publisher": {
+          "@type": "Organization",
+          "name": "Void Coding Ltd.",
+          "url": "https://voidcoding.com"
+        }
+      }
+    </script>
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://voidcoding.com/" />
+    <meta property="og:title" content="Void Coding - Learn, Build, and Master Coding With AI" />
+    <meta property="og:description" content="An AI-powered coding education platform. Learn programming, build workspaces, audit code, and interact with your AI Mentor." />
+    <meta property="og:image" content="/favicon.svg" />
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image" />
+    <meta property="twitter:url" content="https://voidcoding.com/" />
+    <meta property="twitter:title" content="Void Coding - Learn, Build, and Master Coding With AI" />
+    <meta property="twitter:description" content="An AI-powered coding education platform. Learn programming, build workspaces, audit code, and interact with your AI Mentor." />
+    <meta property="twitter:image" content="/favicon.svg" />
+
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="apple-touch-icon" href="/favicon.svg" />
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="theme-color" content="#8B5CF6" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  </head>
+  <body class="bg-black">
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js')
+            .then(reg => console.log('Service Worker registered successfully!', reg.scope))
+            .catch(err => console.log('Service Worker registration failed:', err));
+        });
+      }
+    </script>
+  </body>
+</html>
+

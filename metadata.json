@@ -1,0 +1,6 @@
+{
+  "name": "Void Coding",
+  "description": "An AI-powered coding education platform designed for students to learn programming, build projects, review code, and master software development with an AI mentor.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
