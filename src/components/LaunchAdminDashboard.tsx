@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { apiFetch } from '../lib/api';
 import { 
   Rocket, ShieldCheck, CheckCircle2, AlertTriangle, Cpu, Globe, 
   Sparkles, Code2, Layers, Smartphone, RefreshCw, Eye, Terminal, 
@@ -115,9 +116,7 @@ We wish you all the best in your computer science journey.`
   const loadComplianceStats = async () => {
     setStatsLoading(true);
     try {
-      const res = await fetch('/api/compliance/stats', {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
+      const res = await apiFetch('/api/compliance/stats', { token });
       if (res.ok) {
         const data = await res.json();
         setStats(data);
@@ -132,9 +131,7 @@ We wish you all the best in your computer science journey.`
   const loadSecurityLogs = async () => {
     setLogsLoading(true);
     try {
-      const res = await fetch('/api/compliance/logs', {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
+      const res = await apiFetch('/api/compliance/logs', { token });
       if (res.ok) {
         const data = await res.json();
         setLogs(data);
@@ -161,10 +158,8 @@ We wish you all the best in your computer science journey.`
     setTestingPayload(true);
     setTestResult(null);
     try {
-      const res = await fetch('/api/security/test', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type: selectedExploit, payload: customPayload })
+      const res = await apiFetch('/api/security/test', {
+        json: { type: selectedExploit, payload: customPayload }
       });
       if (res.ok) {
         const data = await res.json();

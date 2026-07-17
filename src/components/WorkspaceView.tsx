@@ -5,6 +5,7 @@ import {
   ArrowRight, Shield, Download, FileUp, ListFilter
 } from 'lucide-react';
 import { googleSignIn, getCachedAccessToken, clearCachedAccessToken } from '../lib/firebaseAuth';
+import { apiFetch } from '../lib/api';
 
 interface WorkspaceViewProps {
   token: string; // our backend token
@@ -162,9 +163,7 @@ export default function WorkspaceView({ token }: WorkspaceViewProps) {
       url += `&q=trashed+%3d+false`;
     }
 
-    const res = await fetch(url, {
-      headers: { Authorization: `Bearer ${googleToken}` }
-    });
+    const res = await apiFetch(url, { token: googleToken });
 
     if (!res.ok) {
       throw { status: res.status, message: 'Google Drive sync failed.' };
@@ -193,13 +192,9 @@ export default function WorkspaceView({ token }: WorkspaceViewProps) {
       // We will perform a simple multipart upload or raw body upload
       // For simplicity and bulletproof performance in iframe browser,
       // creating metadata then updating content is highly reliable.
-      const createRes = await fetch('https://www.googleapis.com/drive/v3/files', {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${googleToken}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(metadata)
+      const createRes = await apiFetch('https://www.googleapis.com/drive/v3/files', {
+        token: googleToken,
+        json: metadata
       });
 
       if (!createRes.ok) throw new Error('Failed to create Drive file schema.');
@@ -207,12 +202,10 @@ export default function WorkspaceView({ token }: WorkspaceViewProps) {
 
       // If it is a text file and has content, upload content
       if (newFileType === 'text' && newFileContent.trim()) {
-        await fetch(`https://www.googleapis.com/upload/drive/v3/files/${fileObj.id}?uploadType=media`, {
+        await apiFetch(`https://www.googleapis.com/upload/drive/v3/files/${fileObj.id}?uploadType=media`, {
+          token: googleToken,
           method: 'PATCH',
-          headers: {
-            Authorization: `Bearer ${googleToken}`,
-            'Content-Type': 'text/plain'
-          },
+          headers: { 'Content-Type': 'text/plain' },
           body: newFileContent
         });
       }
@@ -236,9 +229,9 @@ export default function WorkspaceView({ token }: WorkspaceViewProps) {
 
     setLoading(true);
     try {
-      const res = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}`, {
-        method: 'DELETE',
-        headers: { Authorization: `Bearer ${googleToken}` }
+      const res = await apiFetch(`https://www.googleapis.com/drive/v3/files/${fileId}`, {
+        token: googleToken,
+        method: 'DELETE'
       });
 
       if (!res.ok) throw new Error('Delete operation failed.');
@@ -252,9 +245,7 @@ export default function WorkspaceView({ token }: WorkspaceViewProps) {
 
   // --- GMAIL ENDPOINTS ---
   const fetchEmails = async () => {
-    const res = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=10', {
-      headers: { Authorization: `Bearer ${googleToken}` }
-    });
+    const res = await apiFetch('https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=10', { token: googleToken });
 
     if (!res.ok) {
       throw { status: res.status, message: 'Gmail message fetching failed.' };
@@ -266,9 +257,7 @@ export default function WorkspaceView({ token }: WorkspaceViewProps) {
     // Fetch individual messages details in parallel safely
     const detailedList = await Promise.all(
       msgList.map(async (msg: { id: string }) => {
-        const detailRes = await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages/${msg.id}`, {
-          headers: { Authorization: `Bearer ${googleToken}` }
-        });
+        const detailRes = await apiFetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages/${msg.id}`, { token: googleToken });
         if (!detailRes.ok) return null;
         const detail = await detailRes.json();
         
@@ -316,13 +305,9 @@ export default function WorkspaceView({ token }: WorkspaceViewProps) {
         .replace(/\//g, '_')
         .replace(/=+$/, '');
 
-      const res = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/send', {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${googleToken}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ raw: base64Safe })
+      const res = await apiFetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/send', {
+        token: googleToken,
+        json: { raw: base64Safe }
       });
 
       if (!res.ok) throw new Error('Gmail send request failed.');
@@ -341,9 +326,7 @@ export default function WorkspaceView({ token }: WorkspaceViewProps) {
 
   // --- CLASSROOM ENDPOINTS ---
   const fetchCourses = async () => {
-    const res = await fetch('https://classroom.googleapis.com/v1/courses?courseStates=ACTIVE', {
-      headers: { Authorization: `Bearer ${googleToken}` }
-    });
+    const res = await apiFetch('https://classroom.googleapis.com/v1/courses?courseStates=ACTIVE', { token: googleToken });
 
     if (!res.ok) {
       throw { status: res.status, message: 'Google Classroom course fetching failed.' };
@@ -358,16 +341,12 @@ export default function WorkspaceView({ token }: WorkspaceViewProps) {
     setErrorMsg(null);
     try {
       // Fetch announcements
-      const annRes = await fetch(`https://classroom.googleapis.com/v1/courses/${courseId}/announcements`, {
-        headers: { Authorization: `Bearer ${googleToken}` }
-      });
+      const annRes = await apiFetch(`https://classroom.googleapis.com/v1/courses/${courseId}/announcements`, { token: googleToken });
       const annData = await annRes.json();
       setCourseAnnouncements(annData.announcements || []);
 
       // Fetch coursework
-      const cwRes = await fetch(`https://classroom.googleapis.com/v1/courses/${courseId}/courseWork`, {
-        headers: { Authorization: `Bearer ${googleToken}` }
-      });
+      const cwRes = await apiFetch(`https://classroom.googleapis.com/v1/courses/${courseId}/courseWork`, { token: googleToken });
       const cwData = await cwRes.json();
       setCourseWork(cwData.courseWork || []);
 
@@ -385,13 +364,9 @@ export default function WorkspaceView({ token }: WorkspaceViewProps) {
 
     setLoading(true);
     try {
-      const res = await fetch(`https://classroom.googleapis.com/v1/courses/${selectedCourseId}/announcements`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${googleToken}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ text: announcementText })
+      const res = await apiFetch(`https://classroom.googleapis.com/v1/courses/${selectedCourseId}/announcements`, {
+        token: googleToken,
+        json: { text: announcementText }
       });
 
       if (!res.ok) throw new Error('Posting announcement failed.');

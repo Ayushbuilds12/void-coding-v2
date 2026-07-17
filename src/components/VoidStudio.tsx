@@ -5,6 +5,7 @@ import {
   Plus, Check, Send, Trash2, FileCode, CheckCircle, ExternalLink, HelpCircle
 } from 'lucide-react';
 import { Project, Subscription } from '../types';
+import { apiFetch } from '../lib/api';
 
 interface VoidStudioProps {
   token: string;
@@ -308,16 +309,12 @@ animate();`;
   const handleGenerateWebsite = async () => {
     setIsGenerating(true);
     try {
-      const res = await fetch('/api/code/review', { // reuse code review/helper logic if needed or do custom prompt
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
+      const res = await apiFetch('/api/code/review', { // reuse code review/helper logic if needed or do custom prompt
+        token,
+        json: {
           language: 'html',
           code: prompt // Passing prompt in code space to trigger AI generation
-        })
+        }
       });
 
       if (res.ok) {
@@ -459,17 +456,14 @@ animate();`;
     setSaveStatus('saving');
     
     try {
-      const res = await fetch(`/api/projects/${selectedProject}`, {
+      const res = await apiFetch(`/api/projects/${selectedProject}`, {
+        token,
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
+        json: {
           generatedCode: editorCode,
           prompt: prompt,
           deploymentUrl: `https://void-deploy-sandbox-${selectedProject}.run.app`
-        })
+        }
       });
 
       if (res.ok) {

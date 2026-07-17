@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { ShieldCheck, CreditCard, Sparkles, AlertCircle, RefreshCw, CheckCircle2, Award, FileText, ArrowRight, X } from 'lucide-react';
 import { Subscription, BillingHistory } from '../types';
+import { apiFetch } from '../lib/api';
 
 interface BillingViewProps {
   token: string;
@@ -25,9 +26,7 @@ export default function BillingView({ token, subscription, onRefreshSubscription
   // Load transaction logs
   const loadBillingHistory = async () => {
     try {
-      const res = await fetch('/api/billing/history', {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
+      const res = await apiFetch('/api/billing/history', { token });
       if (res.ok) {
         const history = await res.json();
         setBillingHistory(history);
@@ -55,13 +54,9 @@ export default function BillingView({ token, subscription, onRefreshSubscription
 
     try {
       // Step 1: Create checkout order
-      const orderRes = await fetch('/api/billing/checkout', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ plan: 'pro' })
+      const orderRes = await apiFetch('/api/billing/checkout', {
+        token,
+        json: { plan: 'pro' }
       });
 
       if (orderRes.ok) {
@@ -69,17 +64,13 @@ export default function BillingView({ token, subscription, onRefreshSubscription
         const orderData = await orderRes.json();
         const rzpPayId = `pay_${Math.random().toString(36).substring(2, 11)}`;
 
-        const verifyRes = await fetch('/api/billing/verify', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-          body: JSON.stringify({
+        const verifyRes = await apiFetch('/api/billing/verify', {
+          token,
+          json: {
             razorpayPaymentId: rzpPayId,
             razorpaySubscriptionId: orderData.id,
             plan: 'pro'
-          })
+          }
         });
 
         if (verifyRes.ok) {
@@ -102,9 +93,9 @@ export default function BillingView({ token, subscription, onRefreshSubscription
     setLoading(true);
 
     try {
-      const res = await fetch('/api/billing/cancel', {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${token}` }
+      const res = await apiFetch('/api/billing/cancel', {
+        token,
+        method: 'POST'
       });
       if (res.ok) {
         await onRefreshSubscription();

@@ -5,6 +5,7 @@ import {
   Github, Database, Bell, CreditCard, Link2
 } from 'lucide-react';
 import { Profile } from '../types';
+import { apiFetch } from '../lib/api';
 
 interface SettingsViewProps {
   token: string;
@@ -82,13 +83,10 @@ export default function SettingsView({ token, profile, onRefreshProfile, onLogou
     setProfileMsg(null);
 
     try {
-      const res = await fetch('/api/profile', {
+      const res = await apiFetch('/api/profile', {
+        token,
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ fullName, educationLevel })
+        json: { fullName, educationLevel }
       });
 
       if (res.ok) {
@@ -122,9 +120,9 @@ export default function SettingsView({ token, profile, onRefreshProfile, onLogou
 
     setIsDeleting(true);
     try {
-      const res = await fetch('/api/auth/delete', {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${token}` }
+      const res = await apiFetch('/api/auth/delete', {
+        token,
+        method: 'POST'
       });
 
       if (res.ok) {
@@ -146,9 +144,7 @@ export default function SettingsView({ token, profile, onRefreshProfile, onLogou
   const handleExportAccountReal = async () => {
     setIsExporting(true);
     try {
-      const res = await fetch('/api/auth/export', {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
+      const res = await apiFetch('/api/auth/export', { token });
 
       if (res.ok) {
         const blobData = await res.json();

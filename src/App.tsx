@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { apiFetch } from './lib/api';
 import { 
   LayoutDashboard, FolderDot, BookOpen, Sparkles, Cpu, CreditCard, Settings, 
   LogOut, Menu, X, Award, Download, Cloud, Activity, BookText, FileHeart, ShieldCheck,
@@ -80,9 +81,7 @@ export default function App() {
   // Fetch active SaaS trial status on token change
   useEffect(() => {
     if (token) {
-      fetch('/api/trial/status', {
-        headers: { 'Authorization': `Bearer ${token}` }
-      })
+      apiFetch('/api/trial/status', { token })
         .then(res => res.json())
         .then(data => {
           if (!data.error) setTrialStatus(data);
@@ -105,9 +104,7 @@ export default function App() {
   const fetchInitialData = async (authToken: string) => {
     try {
       // Sync profile & subscription
-      const profileRes = await fetch('/api/profile', {
-        headers: { 'Authorization': `Bearer ${authToken}` }
-      });
+      const profileRes = await apiFetch('/api/profile', { token: authToken });
       if (!profileRes.ok) {
         // Token stale
         handleLogout();
@@ -116,34 +113,28 @@ export default function App() {
       const profileData = await profileRes.json();
       setProfile(profileData);
 
-      const subRes = await fetch('/api/billing/subscription', {
-        headers: { 'Authorization': `Bearer ${authToken}` }
-      });
+      const subRes = await apiFetch('/api/billing/subscription', { token: authToken });
       if (subRes.ok) {
         const subData = await subRes.json();
         setSubscription(subData);
       }
 
       // Sync curriculum lessons catalog
-      const lessonsRes = await fetch('/api/lessons');
+      const lessonsRes = await apiFetch('/api/lessons');
       if (lessonsRes.ok) {
         const lessonsData = await lessonsRes.json();
         setLessons(lessonsData);
       }
 
       // Sync completed progress list
-      const progressRes = await fetch('/api/progress', {
-        headers: { 'Authorization': `Bearer ${authToken}` }
-      });
+      const progressRes = await apiFetch('/api/progress', { token: authToken });
       if (progressRes.ok) {
         const progressData = await progressRes.json();
         setProgress(progressData);
       }
 
       // Sync folders/projects
-      const projRes = await fetch('/api/projects', {
-        headers: { 'Authorization': `Bearer ${authToken}` }
-      });
+      const projRes = await apiFetch('/api/projects', { token: authToken });
       if (projRes.ok) {
         const projData = await projRes.json();
         setProjects(projData);
@@ -185,9 +176,7 @@ export default function App() {
   // Callback to sync folder list updates
   const handleRefreshProjects = async () => {
     try {
-      const res = await fetch('/api/projects', {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
+      const res = await apiFetch('/api/projects', { token });
       if (res.ok) {
         const data = await res.json();
         setProjects(data);
@@ -202,9 +191,7 @@ export default function App() {
   // Callback to sync lesson progress
   const handleRefreshProgress = async () => {
     try {
-      const res = await fetch('/api/progress', {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
+      const res = await apiFetch('/api/progress', { token });
       if (res.ok) {
         const data = await res.json();
         setProgress(data);
@@ -217,9 +204,7 @@ export default function App() {
   // Callback to sync billing/subscription status
   const handleRefreshSubscription = async () => {
     try {
-      const res = await fetch('/api/billing/subscription', {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
+      const res = await apiFetch('/api/billing/subscription', { token });
       if (res.ok) {
         const data = await res.json();
         setSubscription(data);
@@ -299,9 +284,7 @@ export default function App() {
             token={token} 
             profile={profile} 
             onRefreshProfile={async () => {
-              const res = await fetch('/api/profile', {
-                headers: { 'Authorization': `Bearer ${token}` }
-              });
+              const res = await apiFetch('/api/profile', { token });
               if (res.ok) setProfile(await res.json());
             }} 
             onLogout={handleLogout}
@@ -332,16 +315,12 @@ export default function App() {
     
     if (selections.projectName && token) {
       try {
-        await fetch('/api/projects', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-          body: JSON.stringify({
+        await apiFetch('/api/projects', {
+          token,
+          json: {
             name: selections.projectName,
             description: `Academic assignment generated during onboarding for track: ${selections.goal}`
-          })
+          }
         });
         handleRefreshProjects();
       } catch (e) {

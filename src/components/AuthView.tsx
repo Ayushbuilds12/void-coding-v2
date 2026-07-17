@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Sparkles, Terminal, LogIn, UserPlus, AlertCircle, RefreshCw } from 'lucide-react';
+import { apiFetch } from '../lib/api';
 
 interface AuthViewProps {
   onAuthSuccess: (token: string, profile: any) => void;
@@ -34,11 +35,7 @@ export default function AuthView({ onAuthSuccess, onBackToLanding }: AuthViewPro
       : { email, password, fullName, educationLevel };
 
     try {
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
+      const res = await apiFetch(url, { json: payload });
 
       if (res.ok) {
         const data = await res.json();
