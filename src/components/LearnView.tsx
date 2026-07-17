@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { BookOpen, HelpCircle, Code2, Check, ArrowLeft, RefreshCw, AlertCircle, Play } from 'lucide-react';
 import { Lesson, Progress } from '../types';
+import { apiFetch } from '../lib/api';
 
 interface LearnViewProps {
   token: string;
@@ -116,13 +117,9 @@ export default function LearnView({ token, initialSelectedLesson, lessons, progr
   const triggerProgressSync = async (percentage: number) => {
     if (!selectedLesson) return;
     try {
-      await fetch('/api/progress', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ lessonId: selectedLesson.id, completionPercentage: percentage })
+      await apiFetch('/api/progress', {
+        token,
+        json: { lessonId: selectedLesson.id, completionPercentage: percentage }
       });
       await onRefreshProgress();
     } catch (e) {

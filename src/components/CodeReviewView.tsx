@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { ShieldAlert, Zap, BookOpen, AlertCircle, RefreshCw, Star, Code2, Sparkles, CheckCircle2, FileCode } from 'lucide-react';
+import { apiFetch } from '../lib/api';
 
 interface CodeIssue {
   type: string;
@@ -48,13 +49,9 @@ export default function CodeReviewView({ token }: CodeReviewViewProps) {
     setReview(null);
 
     try {
-      const res = await fetch('/api/code/review', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ code, language })
+      const res = await apiFetch('/api/code/review', {
+        token,
+        json: { code, language }
       });
 
       if (res.ok) {

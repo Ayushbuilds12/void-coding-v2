@@ -5,6 +5,7 @@ import {
   History, Eye, FileText, ArrowRight, CornerDownLeft, Info
 } from 'lucide-react';
 import { ChatMessage, Project } from '../types';
+import { apiFetch } from '../lib/api';
 
 interface MentorViewProps {
   token: string;
@@ -45,9 +46,7 @@ export default function MentorView({ token, profile }: MentorViewProps) {
     // Sync available folders/projects for context-awareness
     const fetchWorkspaces = async () => {
       try {
-        const res = await fetch('/api/projects', {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
+        const res = await apiFetch('/api/projects', { token });
         if (res.ok) {
           const data = await res.json();
           setAvailableProjects(data);
@@ -282,16 +281,12 @@ export default function MentorView({ token, profile }: MentorViewProps) {
         ? `\n[Workspace Guidelines for project "${selectedProjObj.name}"]: ${selectedProjObj.description}` 
         : "";
 
-      const res = await fetch('/api/mentor/chat', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ 
+      const res = await apiFetch('/api/mentor/chat', {
+        token,
+        json: { 
           message: promptToSend + projectContextGuidelines,
           history: updatedMessages 
-        })
+        }
       });
 
       if (res.ok) {

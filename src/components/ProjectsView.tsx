@@ -4,6 +4,7 @@ import {
   ChevronRight, Terminal, RefreshCw, FolderClosed, CheckCircle2, AlertCircle 
 } from 'lucide-react';
 import { Project, ChatMessage } from '../types';
+import { apiFetch } from '../lib/api';
 
 interface ProjectsViewProps {
   token: string;
@@ -45,9 +46,7 @@ export default function ProjectsView({ token, initialSelectedProject, onRefreshP
     setChatLoading(true);
     
     try {
-      const res = await fetch(`/api/chats?projectId=${project.id}`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
+      const res = await apiFetch(`/api/chats?projectId=${project.id}`, { token });
       if (res.ok) {
         const history = await res.json();
         setChatMessages(history);
@@ -70,13 +69,9 @@ export default function ProjectsView({ token, initialSelectedProject, onRefreshP
     if (!newProjName.trim()) return;
 
     try {
-      const res = await fetch('/api/projects', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ name: newProjName, description: newProjDesc })
+      const res = await apiFetch('/api/projects', {
+        token,
+        json: { name: newProjName, description: newProjDesc }
       });
 
       if (res.ok) {
@@ -99,13 +94,10 @@ export default function ProjectsView({ token, initialSelectedProject, onRefreshP
     if (!isEditing || !editProjName.trim()) return;
 
     try {
-      const res = await fetch(`/api/projects/${isEditing.id}`, {
+      const res = await apiFetch(`/api/projects/${isEditing.id}`, {
+        token,
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ name: editProjName, description: editProjDesc, status: editProjStatus })
+        json: { name: editProjName, description: editProjDesc, status: editProjStatus }
       });
 
       if (res.ok) {
@@ -128,9 +120,9 @@ export default function ProjectsView({ token, initialSelectedProject, onRefreshP
     if (!confirm('Are you absolutely sure you want to delete this workspace and its full AI instruction log?')) return;
 
     try {
-      const res = await fetch(`/api/projects/${projectId}`, {
-        method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${token}` }
+      const res = await apiFetch(`/api/projects/${projectId}`, {
+        token,
+        method: 'DELETE'
       });
 
       if (res.ok) {
@@ -150,9 +142,9 @@ export default function ProjectsView({ token, initialSelectedProject, onRefreshP
     if (!confirm('Clear all conversation instruction history for this workspace assistant?')) return;
 
     try {
-      const res = await fetch(`/api/chats?projectId=${activeProject.id}`, {
-        method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${token}` }
+      const res = await apiFetch(`/api/chats?projectId=${activeProject.id}`, {
+        token,
+        method: 'DELETE'
       });
       if (res.ok) {
         setChatMessages([]);
@@ -183,13 +175,9 @@ export default function ProjectsView({ token, initialSelectedProject, onRefreshP
     setChatMessages(prev => [...prev, tempUserMsg]);
 
     try {
-      const res = await fetch(`/api/projects/${activeProject.id}/chat`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ message: userMessage })
+      const res = await apiFetch(`/api/projects/${activeProject.id}/chat`, {
+        token,
+        json: { message: userMessage }
       });
 
       if (res.ok) {
