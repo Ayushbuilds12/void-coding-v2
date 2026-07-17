@@ -15,6 +15,7 @@ import {
 
 // Imports of real SaaS integrations
 import { getOpenAIClient, generateOpenAIChatCompletion, generateOpenAIStructuredOutput } from "./server/openai";
+import { signSessionToken, verifySessionToken } from "./server/auth";
 import { getRazorpayInstance, createRazorpayOrderOrSubscription, verifyRazorpaySignature } from "./server/razorpay";
 import {
   getSupabaseClient,
@@ -226,7 +227,12 @@ const authMiddleware = async (req: AuthenticatedRequest, res: Response, next: Ne
     return res.status(401).json({ error: "Unauthorized. Please login." });
   }
   const token = authHeader.split(" ")[1];
-  req.userId = token; // token is userId in local DB, and the Supabase UID in Supabase mode
+  const userId = verifySessionToken(token);
+  if (!userId) {
+    logSecurityEvent("Invalid Session Token", "Rejected request bearing an invalid or expired session token.", "Medium");
+    return res.status(401).json({ error: "Unauthorized. Session invalid or expired." });
+  }
+  req.userId = userId;
   next();
 };
 
@@ -246,6 +252,10 @@ app.post("/api/auth/signup", authLimiter, async (req: Request, res: Response) =>
   const safeFullName = sanitizePayload(fullName);
   const safeEmail = sanitizePayload(email).toLowerCase().trim();
 
+  if (typeof password !== "string" || password.length < 8) {
+    return res.status(400).json({ error: "Password must be at least 8 characters." });
+  }
+
   if (containsLDAPInjection(safeFullName) || containsLDAPInjection(safeEmail)) {
     logSecurityEvent("LDAP Injection Attempt", `Blocked LDAP injection on registration parameters: ${safeFullName}`, "High");
     return res.status(400).json({ error: "Illegal characters detected." });
@@ -255,8 +265,6 @@ app.post("/api/auth/signup", authLimiter, async (req: Request, res: Response) =>
     logSecurityEvent("SSTI Attack Attempt", `Blocked template injection: ${safeFullName}`, "High");
     return res.status(400).json({ error: "Illegal template characters detected." });
   }
-
-  const passwordHash = `hash_${password}`;
 
   try {
     if (isSupabaseActive()) {
@@ -268,9 +276,9 @@ app.post("/api/auth/signup", authLimiter, async (req: Request, res: Response) =>
       logSecurityEvent("User Signed Up", `New user registered via Supabase: ${safeEmail}`, "Low");
       // Send welcome email in background
       sendWelcomeEmail(safeEmail, safeFullName).catch(err => console.error("Error sending welcome email:", err));
-      return res.json(result);
+      return res.json({ ...result, token: signSessionToken(result.token) });
     } else {
-      const result = db.signup(safeEmail, safeFullName, passwordHash, educationLevel || "Beginner");
+      const result = db.signup(safeEmail, safeFullName, password, educationLevel || "Beginner");
       if (!result) {
         logSecurityEvent("Registration Colllision", `Email already registered: ${safeEmail}`, "Low");
         return res.status(400).json({ error: "Email already registered." });
@@ -279,7 +287,7 @@ app.post("/api/auth/signup", authLimiter, async (req: Request, res: Response) =>
       // Send welcome email in background
       sendWelcomeEmail(safeEmail, safeFullName).catch(err => console.error("Error sending welcome email:", err));
       return res.json({
-        token: result.user.id,
+        token: signSessionToken(result.user.id),
         profile: result.profile
       });
     }
@@ -297,7 +305,6 @@ app.post("/api/auth/login", authLimiter, async (req: Request, res: Response) => 
   }
 
   const safeEmail = sanitizePayload(email).toLowerCase().trim();
-  const passwordHash = `hash_${password}`;
 
   try {
     if (isSupabaseActive()) {
@@ -307,16 +314,16 @@ app.post("/api/auth/login", authLimiter, async (req: Request, res: Response) => 
         return res.status(401).json({ error: "Invalid email or password." });
       }
       logSecurityEvent("User Authenticated", `User logged in via Supabase: ${safeEmail}`, "Low");
-      return res.json(result);
+      return res.json({ ...result, token: signSessionToken(result.token) });
     } else {
-      const result = db.login(safeEmail, passwordHash);
+      const result = db.login(safeEmail, password);
       if (!result) {
         logSecurityEvent("Authentication Failure", `Incorrect credentials for email: ${safeEmail}`, "Medium");
         return res.status(401).json({ error: "Invalid email or password." });
       }
       logSecurityEvent("User Authenticated", `User logged in locally: ${safeEmail}`, "Low");
       return res.json({
-        token: result.user.id,
+        token: signSessionToken(result.user.id),
         profile: result.profile
       });
     }
@@ -1344,11 +1351,18 @@ app.post("/api/billing/verify", authMiddleware, async (req: AuthenticatedRequest
 
   try {
     const amount = plan === "pro" ? 499 : 0;
-    
-    // If real Razorpay key is present, verify payment signature
-    if (signature && razorpayOrderId && process.env.RAZORPAY_KEY_SECRET) {
+
+    // When real Razorpay credentials are configured, a valid signature is
+    // mandatory. This prevents clients from self-upgrading to a paid plan by
+    // calling this endpoint without an actual verified payment.
+    if (process.env.RAZORPAY_KEY_SECRET) {
+      if (!signature || !razorpayOrderId) {
+        logSecurityEvent("Payment Verification Rejected", `Missing signature/order for payment ${razorpayPaymentId}.`, "High");
+        return res.status(400).json({ error: "Payment verification failed. Missing signature." });
+      }
       const isValid = verifyRazorpaySignature(razorpayOrderId, razorpayPaymentId, signature);
       if (!isValid) {
+        logSecurityEvent("Payment Signature Invalid", `Rejected forged payment signature for ${razorpayPaymentId}.`, "High");
         return res.status(400).json({ error: "Payment verification failed. Invalid signature." });
       }
     }
