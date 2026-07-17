@@ -55,7 +55,9 @@ export default function SettingsView({ token, profile, onRefreshProfile, onLogou
     if (currentConsent) {
       try {
         basePrefs = JSON.parse(currentConsent).preferences;
-      } catch (e) {}
+      } catch (e) {
+        console.error('Failed to parse stored cookie consent; falling back to defaults.', e);
+      }
     }
 
     const updatedPrefs = {
