@@ -352,6 +352,8 @@ class DBService {
       fs.writeFileSync(DB_FILE, JSON.stringify(this.state, null, 2), 'utf-8');
     } catch (e) {
       console.error('Error saving database state:', e);
+      // Rethrow so callers don't report a write as successful when it wasn't persisted.
+      throw e;
     }
   }
 

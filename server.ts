@@ -342,6 +342,7 @@ app.post("/api/auth/forgot-password", authLimiter, async (req: Request, res: Res
     await sendPasswordResetEmail(safeEmail, resetToken);
     res.json({ success: true, message: "If the email is registered, a security reset token was successfully dispatched." });
   } catch (error: any) {
+    console.error("Password Reset Email Error:", error);
     res.status(500).json({ error: "Failed to dispatch reset email: " + error.message });
   }
 });
@@ -358,9 +359,13 @@ app.post("/api/auth/send-verification", authLimiter, async (req: Request, res: R
   logSecurityEvent("Identity Verification Sent", `OTP code dispatch requested for email: ${safeEmail}`, "Low");
 
   try {
-    await sendVerificationEmail(safeEmail, otpCode);
+    const sent = await sendVerificationEmail(safeEmail, otpCode);
+    if (!sent) {
+      return res.status(502).json({ error: "Failed to send verification email. Please try again." });
+    }
     res.json({ success: true, message: "Identity verification code dispatched successfully." });
   } catch (error: any) {
+    console.error("Verification Email Error:", error);
     res.status(500).json({ error: "Failed to send verification email: " + error.message });
   }
 });
@@ -411,13 +416,21 @@ app.post("/api/auth/delete", authMiddleware, async (req: AuthenticatedRequest, r
     if (isSupabaseActive()) {
       const supabase = getSupabaseClient();
       if (supabase) {
-        // Clear references
-        await supabase.from("chats").delete().eq("user_id", userId);
-        await supabase.from("progress").delete().eq("user_id", userId);
-        await supabase.from("billing_history").delete().eq("user_id", userId);
-        await supabase.from("subscriptions").delete().eq("user_id", userId);
-        await supabase.from("projects").delete().eq("user_id", userId);
-        await supabase.from("profiles").delete().eq("id", userId);
+        // Clear references. Any failure here must surface so a partial GDPR
+        // purge is never reported to the user as a complete erasure.
+        const deletions: { table: string; result: { error: any } }[] = [
+          { table: "chats", result: await supabase.from("chats").delete().eq("user_id", userId) },
+          { table: "progress", result: await supabase.from("progress").delete().eq("user_id", userId) },
+          { table: "billing_history", result: await supabase.from("billing_history").delete().eq("user_id", userId) },
+          { table: "subscriptions", result: await supabase.from("subscriptions").delete().eq("user_id", userId) },
+          { table: "projects", result: await supabase.from("projects").delete().eq("user_id", userId) },
+          { table: "profiles", result: await supabase.from("profiles").delete().eq("id", userId) }
+        ];
+        const failed = deletions.filter(d => d.result.error);
+        if (failed.length > 0) {
+          failed.forEach(d => console.error(`GDPR purge failed for table ${d.table}:`, d.result.error));
+          throw new Error(`Failed to erase records from: ${failed.map(d => d.table).join(", ")}`);
+        }
         // Supabase Auth handles active auth account deletion on admin panel
       }
     } else {
@@ -432,6 +445,7 @@ app.post("/api/auth/delete", authMiddleware, async (req: AuthenticatedRequest, r
     logSecurityEvent("Account Erased", `Account ${userId} successfully wiped under GDPR Article 17.`, "High");
     res.json({ success: true, message: "Your student academy record, profile, progress, billing details and history have been entirely erased from active database registries." });
   } catch (e: any) {
+    console.error("Account Deletion Error:", e);
     res.status(500).json({ error: "Purging procedure failed: " + e.message });
   }
 });
@@ -468,6 +482,7 @@ app.get("/api/auth/export", authMiddleware, async (req: AuthenticatedRequest, re
       return res.json(archive);
     }
   } catch (e: any) {
+    console.error("Compliance Export Error:", e);
     res.status(500).json({ error: "Failed to compile compliance backup archive: " + e.message });
   }
 });
@@ -510,6 +525,7 @@ app.get("/api/trial/status", authMiddleware, async (req: AuthenticatedRequest, r
       }
     });
   } catch (e: any) {
+    console.error("Trial Parameters Error:", e);
     res.status(500).json({ error: "Failed to extract trial parameters." });
   }
 });
@@ -647,6 +663,7 @@ app.get("/api/profile", authMiddleware, async (req: AuthenticatedRequest, res: R
       return res.json(profile);
     }
   } catch (e: any) {
+    console.error("Load Profile Error:", e);
     res.status(500).json({ error: "Failed to load profile." });
   }
 });
@@ -663,6 +680,7 @@ app.get("/api/projects", authMiddleware, async (req: AuthenticatedRequest, res: 
       return res.json(projects);
     }
   } catch (error) {
+    console.error("Fetch Projects Error:", error);
     res.status(500).json({ error: "Failed to fetch projects" });
   }
 });
@@ -683,6 +701,7 @@ app.post("/api/projects", authMiddleware, async (req: AuthenticatedRequest, res:
       return res.json(project);
     }
   } catch (error) {
+    console.error("Create Project Error:", error);
     res.status(500).json({ error: "Failed to create project." });
   }
 });
@@ -700,6 +719,7 @@ app.put("/api/projects/:id", authMiddleware, async (req: AuthenticatedRequest, r
       return res.json(project);
     }
   } catch (error) {
+    console.error("Update Project Error:", error);
     res.status(500).json({ error: "Failed to update project." });
   }
 });
@@ -718,6 +738,7 @@ app.delete("/api/projects/:id", authMiddleware, async (req: AuthenticatedRequest
       return res.json({ success: true, message: "Project and associated chats deleted." });
     }
   } catch (error) {
+    console.error("Delete Project Error:", error);
     res.status(500).json({ error: "Failed to delete project." });
   }
 });
@@ -735,6 +756,7 @@ app.get("/api/chats", authMiddleware, async (req: AuthenticatedRequest, res: Res
       return res.json(chats);
     }
   } catch (error) {
+    console.error("Fetch Chats Error:", error);
     res.status(500).json({ error: "Failed to fetch chats" });
   }
 });
@@ -750,6 +772,7 @@ app.delete("/api/chats", authMiddleware, async (req: AuthenticatedRequest, res: 
       return res.json({ success: true });
     }
   } catch (error) {
+    console.error("Clear Chats Error:", error);
     res.status(500).json({ error: "Failed to clear chats." });
   }
 });
@@ -1268,6 +1291,7 @@ app.get("/api/progress", authMiddleware, async (req: AuthenticatedRequest, res: 
       res.json(db.getProgress(req.userId!));
     }
   } catch (e: any) {
+    console.error("Fetch Progress Error:", e);
     res.status(500).json({ error: "Failed to fetch progress." });
   }
 });
@@ -1287,6 +1311,7 @@ app.post("/api/progress", authMiddleware, async (req: AuthenticatedRequest, res:
       res.json(progress);
     }
   } catch (e: any) {
+    console.error("Update Progress Error:", e);
     res.status(500).json({ error: "Failed to update progress." });
   }
 });
@@ -1303,6 +1328,7 @@ app.get("/api/billing/subscription", authMiddleware, async (req: AuthenticatedRe
       res.json(subscription);
     }
   } catch (e: any) {
+    console.error("Fetch Subscription Error:", e);
     res.status(500).json({ error: "Failed to fetch subscription status." });
   }
 });
@@ -1317,6 +1343,7 @@ app.get("/api/billing/history", authMiddleware, async (req: AuthenticatedRequest
       res.json(history);
     }
   } catch (e: any) {
+    console.error("Fetch Billing History Error:", e);
     res.status(500).json({ error: "Failed to fetch billing history." });
   }
 });
@@ -1332,6 +1359,7 @@ app.post("/api/billing/checkout", authMiddleware, async (req: AuthenticatedReque
     const checkoutData = await createRazorpayOrderOrSubscription(req.userId!, plan);
     res.json(checkoutData);
   } catch (error: any) {
+    console.error("Checkout Session Error:", error);
     res.status(500).json({ error: "Checkout session creation failed: " + error.message });
   }
 });
@@ -1438,6 +1466,7 @@ app.post("/api/billing/cancel", authMiddleware, async (req: AuthenticatedRequest
       });
     }
   } catch (error: any) {
+    console.error("Cancel Subscription Error:", error);
     res.status(500).json({ error: "Failed to cancel subscription." });
   }
 });

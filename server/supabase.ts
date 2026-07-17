@@ -151,17 +151,28 @@ export async function supabaseGetProfileAndSubscription(userId: string) {
   if (!supabase) return null;
 
   try {
-    const { data: profile } = await supabase
+    const { data: profile, error: profileError } = await supabase
       .from("profiles")
       .select("*")
       .eq("id", userId)
       .single();
 
-    let { data: subscription } = await supabase
+    // PGRST116 = no rows found, which is an expected "not present" case here.
+    if (profileError && profileError.code !== "PGRST116") {
+      console.error("Supabase get profile error:", profileError);
+      throw new Error(profileError.message);
+    }
+
+    let { data: subscription, error: subFetchError } = await supabase
       .from("subscriptions")
       .select("*")
       .eq("user_id", userId)
       .single();
+
+    if (subFetchError && subFetchError.code !== "PGRST116") {
+      console.error("Supabase get subscription error:", subFetchError);
+      throw new Error(subFetchError.message);
+    }
 
     if (!subscription && profile) {
       // Create subscription on the fly if missing
@@ -174,7 +185,11 @@ export async function supabaseGetProfileAndSubscription(userId: string) {
         razorpay_subscription_id: null,
         created_at: new Date().toISOString()
       };
-      await supabase.from("subscriptions").insert(subscription);
+      const { error: subInsertError } = await supabase.from("subscriptions").insert(subscription);
+      if (subInsertError) {
+        console.error("Supabase default subscription insert error:", subInsertError);
+        throw new Error(subInsertError.message);
+      }
     }
 
     return {
@@ -192,7 +207,11 @@ export async function supabaseGetProfileAndSubscription(userId: string) {
 export async function supabaseGetProjects(userId: string): Promise<Project[]> {
   const supabase = getSupabaseClient();
   if (!supabase) return [];
-  const { data } = await supabase.from("projects").select("*").eq("user_id", userId);
+  const { data, error } = await supabase.from("projects").select("*").eq("user_id", userId);
+  if (error) {
+    console.error("Supabase get projects error:", error);
+    throw new Error(error.message);
+  }
   return (data || []) as Project[];
 }
 
@@ -214,7 +233,11 @@ export async function supabaseCreateProject(userId: string, name: string, descri
     updated_at: new Date().toISOString()
   };
 
-  await supabase.from("projects").insert(project);
+  const { error } = await supabase.from("projects").insert(project);
+  if (error) {
+    console.error("Supabase create project error:", error);
+    throw new Error(error.message);
+  }
   return project;
 }
 
@@ -244,13 +267,18 @@ export async function supabaseUpdateProject(
   if (generatedCode !== undefined) updates.generated_code = generatedCode;
   if (deploymentUrl !== undefined) updates.deployment_url = deploymentUrl;
 
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("projects")
     .update(updates)
     .eq("id", projectId)
     .eq("user_id", userId)
     .select()
     .single();
+
+  if (error) {
+    console.error("Supabase update project error:", error);
+    throw new Error(error.message);
+  }
 
   return data as Project;
 }
@@ -259,9 +287,17 @@ export async function supabaseDeleteProject(userId: string, projectId: string): 
   const supabase = getSupabaseClient();
   if (!supabase) return false;
 
-  await supabase.from("chats").delete().eq("project_id", projectId);
+  const { error: chatDeleteError } = await supabase.from("chats").delete().eq("project_id", projectId);
+  if (chatDeleteError) {
+    console.error("Supabase delete project chats error:", chatDeleteError);
+    throw new Error(chatDeleteError.message);
+  }
   const { error } = await supabase.from("projects").delete().eq("id", projectId).eq("user_id", userId);
-  return !error;
+  if (error) {
+    console.error("Supabase delete project error:", error);
+    throw new Error(error.message);
+  }
+  return true;
 }
 
 export async function supabaseGetChats(userId: string, projectId: string | null): Promise<ChatMessage[]> {
@@ -275,7 +311,11 @@ export async function supabaseGetChats(userId: string, projectId: string | null)
     query.is("project_id", null);
   }
 
-  const { data } = await query.order("created_at", { ascending: true });
+  const { data, error } = await query.order("created_at", { ascending: true });
+  if (error) {
+    console.error("Supabase get chats error:", error);
+    throw new Error(error.message);
+  }
   return (data || []) as ChatMessage[];
 }
 
@@ -292,7 +332,11 @@ export async function supabaseAddChatMessage(userId: string, projectId: string |
     created_at: new Date().toISOString()
   };
 
-  await supabase.from("chats").insert(chat);
+  const { error } = await supabase.from("chats").insert(chat);
+  if (error) {
+    console.error("Supabase add chat message error:", error);
+    throw new Error(error.message);
+  }
   return chat;
 }
 
@@ -306,13 +350,21 @@ export async function supabaseClearChats(userId: string, projectId: string | nul
   } else {
     query.is("project_id", null);
   }
-  await query;
+  const { error } = await query;
+  if (error) {
+    console.error("Supabase clear chats error:", error);
+    throw new Error(error.message);
+  }
 }
 
 export async function supabaseGetProgress(userId: string): Promise<Progress[]> {
   const supabase = getSupabaseClient();
   if (!supabase) return [];
-  const { data } = await supabase.from("progress").select("*").eq("user_id", userId);
+  const { data, error } = await supabase.from("progress").select("*").eq("user_id", userId);
+  if (error) {
+    console.error("Supabase get progress error:", error);
+    throw new Error(error.message);
+  }
   return (data || []) as Progress[];
 }
 
@@ -323,12 +375,18 @@ export async function supabaseUpdateProgress(userId: string, lessonId: string, c
   const now = new Date().toISOString();
   
   // Find current highest progress first
-  const { data: existing } = await supabase
+  const { data: existing, error: existingError } = await supabase
     .from("progress")
     .select("*")
     .eq("user_id", userId)
     .eq("lesson_id", lessonId)
     .single();
+
+  // PGRST116 = no existing progress row yet, handled by the insert branch below.
+  if (existingError && existingError.code !== "PGRST116") {
+    console.error("Supabase get existing progress error:", existingError);
+    throw new Error(existingError.message);
+  }
 
   if (existing) {
     if (completionPercentage > existing.completion_percentage) {
@@ -336,13 +394,17 @@ export async function supabaseUpdateProgress(userId: string, lessonId: string, c
       if (completionPercentage >= 100) {
         updates.completed_at = now;
       }
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from("progress")
         .update(updates)
         .eq("user_id", userId)
         .eq("lesson_id", lessonId)
         .select()
         .single();
+      if (error) {
+        console.error("Supabase update progress error:", error);
+        throw new Error(error.message);
+      }
       return data as Progress;
     }
     return existing as Progress;
@@ -354,7 +416,11 @@ export async function supabaseUpdateProgress(userId: string, lessonId: string, c
       completion_percentage: completionPercentage,
       completed_at: completionPercentage >= 100 ? now : undefined
     };
-    await supabase.from("progress").insert(newProgress);
+    const { error } = await supabase.from("progress").insert(newProgress);
+    if (error) {
+      console.error("Supabase insert progress error:", error);
+      throw new Error(error.message);
+    }
     return newProgress;
   }
 }
@@ -374,11 +440,16 @@ export async function supabaseUpdateSubscription(userId: string, plan: "free" | 
     updates.razorpay_customer_id = `cust_${Math.random().toString(36).substring(2, 11)}`;
   }
 
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("subscriptions")
     .upsert({ user_id: userId, ...updates })
     .select()
     .single();
+
+  if (error) {
+    console.error("Supabase update subscription error:", error);
+    throw new Error(error.message);
+  }
 
   return data as Subscription;
 }
@@ -386,7 +457,11 @@ export async function supabaseUpdateSubscription(userId: string, plan: "free" | 
 export async function supabaseGetBillingHistory(userId: string): Promise<BillingHistory[]> {
   const supabase = getSupabaseClient();
   if (!supabase) return [];
-  const { data } = await supabase.from("billing_history").select("*").eq("user_id", userId).order("created_at", { ascending: false });
+  const { data, error } = await supabase.from("billing_history").select("*").eq("user_id", userId).order("created_at", { ascending: false });
+  if (error) {
+    console.error("Supabase get billing history error:", error);
+    throw new Error(error.message);
+  }
   return (data || []) as BillingHistory[];
 }
 
@@ -407,6 +482,10 @@ export async function supabaseAddBillingHistory(userId: string, amount: number, 
     created_at: new Date().toISOString()
   };
 
-  await supabase.from("billing_history").insert(history);
+  const { error } = await supabase.from("billing_history").insert(history);
+  if (error) {
+    console.error("Supabase add billing history error:", error);
+    throw new Error(error.message);
+  }
   return history;
 }
