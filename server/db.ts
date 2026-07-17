@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { Profile, Project, ChatMessage, Lesson, Progress, Subscription, BillingHistory } from '../src/types';
+import { hashPassword, verifyPassword } from './auth';
 
 const DB_DIR = path.join(process.cwd(), 'data');
 const DB_FILE = path.join(DB_DIR, 'db.json');
@@ -356,13 +357,13 @@ class DBService {
   }
 
   // --- Auth & Profile ---
-  public signup(email: string, fullName: string, passwordHash: string, educationLevel: string): { user: AuthUser; profile: Profile } | null {
+  public signup(email: string, fullName: string, password: string, educationLevel: string): { user: AuthUser; profile: Profile } | null {
     const trimmedEmail = email.toLowerCase().trim();
     const exists = this.state.users.find(u => u.email === trimmedEmail);
     if (exists) return null;
 
     const id = Math.random().toString(36).substring(2, 11);
-    const user: AuthUser = { id, email: trimmedEmail, passwordHash };
+    const user: AuthUser = { id, email: trimmedEmail, passwordHash: hashPassword(password) };
     const profile: Profile = {
       id,
       email: trimmedEmail,
@@ -391,10 +392,10 @@ class DBService {
     return { user, profile };
   }
 
-  public login(email: string, passwordHash: string): { user: AuthUser; profile: Profile } | null {
+  public login(email: string, password: string): { user: AuthUser; profile: Profile } | null {
     const trimmedEmail = email.toLowerCase().trim();
-    const user = this.state.users.find(u => u.email === trimmedEmail && u.passwordHash === passwordHash);
-    if (!user) return null;
+    const user = this.state.users.find(u => u.email === trimmedEmail);
+    if (!user || !verifyPassword(password, user.passwordHash)) return null;
 
     const profile = this.state.profiles.find(p => p.id === user.id);
     if (!profile) return null;
